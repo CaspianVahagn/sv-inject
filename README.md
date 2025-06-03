@@ -71,8 +71,8 @@ authService.authenticate(credentials);
 ### Creating a Request-Scoped Context (SSR)
 
 ```typescript
-import { makeInjectionContext, type ApplicationConfig } from '@sv-inject/core';
-
+import { type ApplicationConfig } from '@sv-inject/core';
+import { makeInjectionContext } from "@sv-inject/core/server"
 // In an Astro middleware
 export const MyMiddleware = defineMiddleware(async (context, next) => {
   return new Promise<Response>(async (resolve, reject) => {
@@ -96,11 +96,3 @@ export const MyMiddleware = defineMiddleware(async (context, next) => {
   });
 });
 ```
-
-## API Reference
-
-See the [full documentation](https://github.com/yourusername/sv-inject) for a complete API reference.
-
-## License
-
-ISC
