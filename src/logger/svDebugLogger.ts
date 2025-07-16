@@ -1,6 +1,6 @@
 // Simple logger implementation
-class Logger {
-  private _enabled = true;
+class SVDebugLogger {
+  private _enabled = false;
 
   enable(){
     this._enabled = true;
@@ -44,4 +44,4 @@ class Logger {
   }
 }
 
-export default new Logger();
+export default new SVDebugLogger();

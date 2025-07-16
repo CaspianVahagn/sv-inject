@@ -1,6 +1,7 @@
 // Main entry point for the sv-inject library
 
 // Export core DI components
+
 export {
   Service,
   inject,
@@ -8,6 +9,9 @@ export {
   svInject,
   svInjectOptional,
   fromAppContext,
+  createToken,
+  setSSRDetection,
+  teardownTestContainer,
   type Tokenizable,
   type ApplicationConfig
 } from './CustomDI/AppInjector.ts';
@@ -18,4 +22,5 @@ export { type PostConstructable } from './CustomDI/life-cycle.types.ts';
 export { SSR_Storage, CONTAINER_KEY } from './CustomDI/ssr-di.utils.ts';
 
 // Export app configuration
-export { appConfig } from './AppConfig.ts';
+export { appConfig, setGlobalAppConfig } from './AppConfig.ts';
+export  * as SvDebugLogger from './logger/svDebugLogger.ts';

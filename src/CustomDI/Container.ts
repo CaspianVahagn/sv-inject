@@ -1,6 +1,6 @@
 import { type ApplicationConfig, injectableConstructors, type Tokenizable } from "./AppInjector.ts";
 import { appConfig } from "../AppConfig.ts";
-import Logger from "../logger/logger.ts";
+import Logger from "../logger/svDebugLogger.ts";
 
 export class Container {
   // holding instances of injectable classes by key
@@ -16,11 +16,11 @@ export class Container {
   }
 
   public postConstruct(): void {
-    this.registry.forEach(([_ ,value]) => {
-        if(value.postConstruct){
-          value.postConstruct();
-        }
-    });
+    for( let [_ ,value] of this.registry.entries()){
+      if(value.postConstruct){
+        value.postConstruct();
+      }
+    }
     this.isInitialized = true;
   }
 
@@ -31,14 +31,16 @@ export class Container {
     }
 
     if (key.prototype?.constructor?.name) {
-      this.register(key.prototype.constructor.name, providedInstance);
+      // @ts-ignore
+      this.register(key.prototype._service_prop, providedInstance);
     } else {
-      throw new Error("Cannot register nameless constructors");
+      throw new Error("Cannot register untokenizable" + JSON.stringify(key));
     }
   }
 
   register(key: string, instance: any) {
     if (this.registry.has(key)) {
+      console.warn("InjectionContainer - cannot register duplicate key: " + key )
       return;
     }
     this.registry.set(key, instance);
@@ -68,15 +70,15 @@ export class Container {
 
   getByClass<T>(token: new (...args: any[]) => T): T {
     if (token.prototype?.constructor?.name) {
-      if (!this.has(token.prototype?.constructor?.name)) {
-        const clazz = injectableConstructors.get(token.prototype?.constructor?.name);
+      if (!this.has(token.prototype?._service_prop)) {
+        const clazz = injectableConstructors.get(token.prototype?._service_prop);
         if (clazz) {
           this.registerProvider(token as Tokenizable, new clazz());
         } else {
-          throw new Error("No constructor exists for: " + token.prototype?.constructor?.name);
+          throw new Error("No constructor exists for: " + token.prototype?._service_prop);
         }
       }
-      return this.get<T>(token.prototype?.constructor?.name);
+      return this.get<T>(token.prototype?._service_prop);
     }
     throw new Error("No token id provided");
   }
@@ -99,6 +101,9 @@ export class Container {
   }
 
   loadConfig(config: ApplicationConfig) {
+    if(this.isInitialized){
+      console.trace("reinitialize container, all duplicate providers will be ignored")
+    }
     try {
       for (const element of config) {
         this.registerProvider(element.token, element.provide);

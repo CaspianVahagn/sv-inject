@@ -1,7 +1,7 @@
 {
-  "name": "@sv-inject/core",
+  "name": "sv-inject",
   "private": false,
-  "version": "1.0.0",
+  "version": "0.0.17",
   "description": "A lightweight, TypeScript-based dependency injection system designed for Astro applications with SSR support",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,7 +36,7 @@
     "svelte"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.15.27",
     "tsup": "^8.5.0",
@@ -48,8 +48,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "dependencies": {
-    "@sv-inject/core": "file:sv-inject-core-1.0.0.tgz"
   }
 }
