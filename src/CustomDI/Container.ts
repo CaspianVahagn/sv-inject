@@ -40,12 +40,18 @@ export class Container {
         }
     }
 
-    registerFactory(key: string, factory: () => any) {
-        if (this.registry.has(key)) {
+    registerFactory(key: Tokenizable, factory: () => any) {
+        // @ts-ignore
+        const identifier: string | undefined = key.id || key.prototype?._service_prop;
+        if(!identifier) {
+            throw new Error("Cannot register untokenizable" + JSON.stringify(key));
+        }
+
+        if (this.registry.has(identifier)) {
             console.warn("InjectionContainer - cannot register duplicate key: " + key)
             return;
         }
-        this.registry.set(key, { _factory_: factory } as FactoryEntry);
+        this.registry.set(identifier, { _factory_: factory } as FactoryEntry);
         Logger.log(`Added ${key} to the registry.`);
     }
 
@@ -121,7 +127,10 @@ export class Container {
         }
         try {
             for (const element of config) {
-                this.registerProvider(element.token, element.provide);
+                if(element.provide)
+                    this.registerProvider(element.token, element.provide);
+                if(element.factory)
+                    this.registerFactory(element.token, element.factory);
             }
         } catch (e) {
             Logger.err(e);

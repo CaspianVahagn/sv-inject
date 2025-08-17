@@ -131,8 +131,8 @@ function activator<T>(type: { new(): T }): T {
 }
 
 export type Provider<T = any> =  {
-    provide?: T;
     token: Tokenizable<T>;
+    provide?: T;
     factory?: () => T;
 }
 

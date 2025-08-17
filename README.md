@@ -291,6 +291,83 @@ setGlobalAppConfig([
 ]);
 ```
 
+### Providers and Factories
+
+sv-inject supports registering values and factories via the Provider type and the container API.
+
+Provider type shape:
+
+```ts
+export type Provider<T = any> = {
+  token: Tokenizable<T>;
+  provide?: T;         // directly provide an instance/value (singleton within the container)
+  factory?: () => T;   // provide a factory that is executed on every injection
+}
+```
+
+You can use providers in your ApplicationConfig (global or request-scoped via makeInjectionContext):
+
+```ts
+import { createToken, type ApplicationConfig } from 'sv-inject';
+
+// Define tokens
+export const LOGGER_TOKEN = createToken<Logger>('LOGGER');
+
+// Example abstract contract
+@Service()
+export abstract class Logger {
+  abstract log(msg: string): void;
+}
+
+// Concrete implementation
+class ConsoleLogger extends Logger {
+  log(msg: string) { console.log(msg); }
+}
+
+// Concrete implementation 2
+class RemoteLogger extends Logger {
+    log(msg: string) { RemoteLogService.sendLog(msg); }
+}
+
+
+// Configure using a factory so that a specific implementation is injected for an abstract key
+const config: ApplicationConfig = [
+  {
+    token: LOGGER_TOKEN,          // abstract token or abstract class can be used as the key
+    factory: () => {
+        if(isDevMode()){
+            return new ConsoleLogger();
+        }
+        return new RemoteLogger();
+    },
+  },
+];
+```
+
+Registering factories programmatically:
+
+```ts
+// At startup or within SSR request configuration
+const container = initContainer();
+container.registerFactory(LOGGER_TOKEN, () => new ConsoleLogger());
+```
+
+Important notes about factories:
+- Factories are re-executed on every injection or container.get(...) call for that token/key.
+- If you need a singleton-like behavior, either:
+  - Use provide with a pre-built instance, or
+  - Memoize inside your factory:
+  - memo/cache clean up should be taken with care as this is a source of memory leaks
+
+```ts
+const memoLoggerFactory = (() => {
+  let cached: Logger | undefined;
+  return () => (cached ??= new ConsoleLogger());
+})();
+
+initContainer().registerFactory(LOGGER_TOKEN, memoLoggerFactory);
+```
+
 ### SSR Utilities
 
 #### `makeInjectionContext<T>(callback: () => Promise<T>, config?: ApplicationConfig): Promise<T>`
