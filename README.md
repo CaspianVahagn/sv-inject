@@ -223,21 +223,6 @@ class UserService {
 }
 ```
 
-#### `@inject(options?)`
-
-Marks constructor parameters for injection.
-
-```typescript
-constructor(@inject() userService: UserService) {
-  // Constructor implementation
-}
-```
-
-Options:
-- `key?: string` - Custom key for the injection
-- `def?: { prototype: { constructor: Function } }` - Class definition
-- `token?: Tokenizable` - Token for the injection
-
 ### Injection Methods
 
 #### `svInject<T>(token: new (...args: any[]) => T): T`
@@ -383,13 +368,9 @@ This avoids runtime errors when rendering in non-SSR or static contexts.
 
 ### ⚠️ Lifecycle Awareness
 
-Do **not** access SSR-only tokens or runtime-injected tokens:
-
-* In **global scope**
-* In **constructor parameters**
-* Outside the injection context
-
-Instead, inject them dynamically or in the `postConstruct` lifecycle hook:
+In a case where you need to perform a Injection exactly in the same time as a Provider is created, e.g. At "AppConfiguration" level, 
+or somehwere Post app Initialization, you can use the `postConstruct` lifecycle hook, to inject the service after the provider is created,
+Or use `svInject` on demand at method/function level. 
 
 ```ts
 @Service()
@@ -421,13 +402,11 @@ initContainer().registerProvider({ id: 'LOCALE' }, 'en-US');
 ```
 
 
-
 ### 🔄 Injection Order & Circular Dependency Protection
 
 * Injection order is resolved automatically by the DI container.
 * Circular dependencies are avoided through lazy resolution at decorator evaluation time.
 * This ensures **predictable and safe injection flow**, even across complex service graphs.
-
 
 
 ## ❓ Why Request-Scoped Containers Matter

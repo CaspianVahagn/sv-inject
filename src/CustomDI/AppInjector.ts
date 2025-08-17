@@ -130,7 +130,13 @@ function activator<T>(type: { new(): T }): T {
     return instance;
 }
 
-export type ApplicationConfig = { token: Tokenizable; provide: any }[];
+export type Provider<T = any> =  {
+    provide?: T;
+    token: Tokenizable<T>;
+    factory?: () => T;
+}
+
+export type ApplicationConfig = Provider[];
 
 export function initContainer(): Container {
     if (import.meta.env.SSR) {
