@@ -37,18 +37,14 @@ A lightweight, TypeScript-based dependency injection system designed primarily f
 
 ## 🚀 Features
 
-- ✅ Decorator-based service registration (`@Service()`) and dependency injection (`@inject()`)
-- 🔁 Constructor parameter injection
+- ✅ Decorator-based service registration (`@Service()`) and dependency injection (`svInject()`)
 - 📦 Request-scoped containers for safe SSR execution
 - ⚙️ Lifecycle hooks (`postConstruct`)
 - 🔌 Integrations for Astro, Next.js, and other Vite-based SSR frameworks
 - 🛠 Framework-agnostic: use in any modern TypeScript SSR app
 
-**important:** since this framework should be minimal, no "module scope" will be implemented.
+**important:** since this framework should be minimal, no automatic resolution of "module/component scope" will be implemented.
 If you fear "global state pollution", you have to add containers to the root injection context, yourself.
-
-Multi token/instance etc is also not part of this projects scope.
-
 
 ---
 
@@ -112,6 +108,30 @@ class AuthService {
 }
 ```
 
+Or as explicit constructor injection:
+
+```typescript
+import { Service } from 'sv-inject';
+
+// Define a service with dependencies
+@Service()
+class AuthService {
+
+    constructor(
+        private userService = svInject(UserService)
+    ) {
+// Service initialization
+    }
+
+    authenticate(credentials: any) {
+// Use injected userService
+        const user = this.userService.getUser(credentials.userId);
+// Implementation
+    }
+}
+```
+
+
 ### Using Services in Components
 
 ```typescript
@@ -168,11 +188,14 @@ export const MyMiddleware = defineMiddleware(async (context, next) => {
 ### SSR Detection
 
 By default this library uses `import.meta.env.SSR` to detect SSR contexts. 
-If this is not available in your framework you have to use:
+If this is not available in your framework you have to use something like this before first container initialisation:
 
-`export function setSSRDetection(isSSRfn : () => boolean)`
+```typescript
+import { setSSRDetection } from 'sv-inject';
 
+setSSRDetection(() => typeof window === "undefined");
 
+```
 
 ### NextJS Example
 
@@ -258,6 +281,7 @@ The core container class for dependency injection.
 
 Methods:
 - `registerProvider(key: Tokenizable, providedInstance: any)`: Registers a provider with a token
+- `registerFactory(key: Tokenizable, providedInstance: () => any)`: Registers a Factory with a token
 - `register(key: string, instance: any)`: Registers an instance with a string key
 - `getByToken<T>(token: Tokenizable<T>): T`: Gets an instance by token
 - `getByTokenOptional<T>(token: Tokenizable): T | undefined`: Gets an instance by token, returning undefined if not found
@@ -281,11 +305,11 @@ Suitable places should be: index.ts or similar.
 ```typescript
 import { createToken } from "./sv-inject";
 
-const API_URL_TOKEN = createToken<string>("https://my.api.com")
+const API_URL_TOKEN = createToken<string>("API_URL")
 
 setGlobalAppConfig([
   {
-    token: { id: 'API_URL' },
+    token: API_URL_TOKEN,
     provide: 'https://api.example.com'
   }
 ]);
@@ -305,15 +329,12 @@ export type Provider<T = any> = {
 }
 ```
 
-You can use providers in your ApplicationConfig (global or request-scoped via makeInjectionContext):
+You can use providers in your ApplicationConfig (global or request-scoped via `makeInjectionContext`):
 
 ```ts
 import { createToken, type ApplicationConfig } from 'sv-inject';
 
-// Define tokens
-export const LOGGER_TOKEN = createToken<Logger>('LOGGER');
-
-// Example abstract contract
+// Example abstract contract, this abstract class is now used as a key for the injection context
 @Service()
 export abstract class Logger {
   abstract log(msg: string): void;
@@ -333,7 +354,7 @@ class RemoteLogger extends Logger {
 // Configure using a factory so that a specific implementation is injected for an abstract key
 const config: ApplicationConfig = [
   {
-    token: LOGGER_TOKEN,          // abstract token or abstract class can be used as the key
+    token: Logger,          // abstract token or abstract class can be used as the key
     factory: () => {
         if(isDevMode()){
             return new ConsoleLogger();
@@ -344,9 +365,11 @@ const config: ApplicationConfig = [
 ];
 ```
 
-Registering factories programmatically:
+Registering factories programmatically with a token:
 
 ```ts
+import { createToken, initContainer } from 'sv-inject';
+const RemoteLogger = createToken<Logger>("LOGGER");
 // At startup or within SSR request configuration
 const container = initContainer();
 container.registerFactory(LOGGER_TOKEN, () => new ConsoleLogger());
@@ -362,7 +385,12 @@ Important notes about factories:
 ```ts
 const memoLoggerFactory = (() => {
   let cached: Logger | undefined;
-  return () => (cached ??= new ConsoleLogger());
+  return () => {
+      if(isDevMode()){
+          return chached ??= new ConsoleLogger();
+      }
+      return cached ??= new RemoteLogger();
+  };
 })();
 
 initContainer().registerFactory(LOGGER_TOKEN, memoLoggerFactory);
@@ -372,7 +400,7 @@ initContainer().registerFactory(LOGGER_TOKEN, memoLoggerFactory);
 
 #### `makeInjectionContext<T>(callback: () => Promise<T>, config?: ApplicationConfig): Promise<T>`
 
-Creates an injection context utilizing async local storage and an application container. This method is mandatory for SSR request context aware injection containers.
+Creates an injection context utilizing [async local storage](https://nodejs.org/api/async_context.html#class-asynclocalstorage) and an application container. This method is mandatory for SSR request context aware injection containers.
 
 ```typescript
 await makeInjectionContext(async () => {
@@ -389,10 +417,10 @@ await makeInjectionContext(async () => {
 
 ### Defining Tokens
 
-A token can be create with a unique `id`:
+A token can be created with a unique `id`:
 
 ```ts
-import { createToken } from "./sv-inject";
+import { createToken } from "sv-inject";
 const REQUEST_TOKEN = createToken("REQUEST");
 ```
 
@@ -403,7 +431,7 @@ const REQUEST_TOKEN = createToken("REQUEST");
 It is **strongly advised** to define all tokens within your `ApplicationConfig`:
 
 ```ts
-import { createToken } from "./sv-inject";
+import { createToken, setGlobalAppConfig } from "sv-inject";
 
 const REQUEST_TOKEN = createToken("REQUEST");
 
@@ -413,24 +441,27 @@ const config: ApplicationConfig = [
     provide: request
   },
 ];
+
+setGlobalAppConfig(config)
 ```
 
 For the global AppConfig (or initial tokens/services etc):
 
 - For Global and CSR with `setGlobalAppConfig(config)` in index of your application.
-  > ⚠️ Important everything in this config will NOT be request scoped.
-  > All configs that are request scoped on SSR must be used separately.
+  > ⚠️ ON SSR: Important everything in this config will NOT be request scoped
+  > All configs that are request scoped on SSR have to be considered "optional" in client-side code.
  
-- For SSR with `makeInjectionContext(asyncfun, config)`.
+- For SSR with `makeInjectionContext(asyncfun, ssrConfig)`.
+- The GlobalAppConfig and the passed SSR Config are merged together and applied in order. 
 
-These tokens are bound to the **request lifecycle**, ensuring safe and isolated access per user.
+These Providers are bound to the **request lifecycle**, ensuring safe and isolated access per user.
 
-### 🧩 Optional SSR Tokens
+### 🧩 Optional (e.g. exclusive SSR) Tokens
 
 Tokens that **only exist during SSR** should be marked as **optional** using:
 
 ```ts
-import { createToken } from "./AppInjector";
+import { createToken, svInjectOptional } from "sv-inject";;
 
 const SSR_ONLY_TOKEN = createToken<MyType>("SSR_ONLY_TOKEN");
 
@@ -439,15 +470,16 @@ const value = svInjectOptional(SSR_ONLY_TOKEN);
 
 This avoids runtime errors when rendering in non-SSR or static contexts.
 
-
-
 ## ⚙️ Advanced Usage
 
 ### ⚠️ Lifecycle Awareness
 
 In a case where you need to perform a Injection exactly in the same time as a Provider is created, e.g. At "AppConfiguration" level, 
-or somehwere Post app Initialization, you can use the `postConstruct` lifecycle hook, to inject the service after the provider is created,
-Or use `svInject` on demand at method/function level. 
+or somewhere Post app Initialization, you can use the `postConstruct` lifecycle hook, to inject the service after the provider is created,
+Or use `svInject` on demand at method/function level, to avoid null/undefined injections. 
+
+This should be avoided in most cases, as it makes testing and debugging more difficult.
+
 
 ```ts
 @Service()
@@ -466,7 +498,8 @@ class Example {
 
 All services in `sv-inject` are **singletons** by default within their container context.
 
-If a service or state needs to be reused or injected dynamically, register it manually using:
+If a service or state needs to be recreated on each injection: Use a factory. 
+If as instance needs to be created later than app initialization and injected dynamically, register it manually using:
 
 ```ts
 initContainer().registerProvider(token, instance);
@@ -475,15 +508,28 @@ initContainer().registerProvider(token, instance);
 For example:
 
 ```ts
-initContainer().registerProvider({ id: 'LOCALE' }, 'en-US');
+import { createToken } from "sv-inject";
+
+const LOCALE_TOKEN = createToken<string>("LOCALE");
+
+initContainer().registerProvider(LOCALE_TOKEN, 'en-US');
 ```
 
 
-### 🔄 Injection Order & Circular Dependency Protection
+### 🔄 Injection Order
 
 * Injection order is resolved automatically by the DI container.
-* Circular dependencies are avoided through lazy resolution at decorator evaluation time.
 * This ensures **predictable and safe injection flow**, even across complex service graphs.
+
+### Circular dependency 
+* Circular dependencies are not resolved automatically.
+* If you need to inject a circular dependency:
+ - don't 
+ - delegate the injection either into `postConstruct` or the method that needs it.
+ - or use a factory with custom constructor logic
+
+No warranty is given for circular dependency resolution.
+
 
 
 ## ❓ Why Request-Scoped Containers Matter

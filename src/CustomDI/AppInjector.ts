@@ -3,11 +3,20 @@ import { Container } from "./Container.ts";
 import Logger from "../logger/svDebugLogger.ts";
 import { CONTAINER_KEY, SSR_Storage } from "./ssr-di.utils.ts";
 
+export type Class<T = any> = new (...args: any[]) => T;
 export type Tokenizable<T = any> = {
     prototype?: new (...args: any[]) => T;
     id?: string;
     _?: T
 };
+
+export type Provider<T = any> =  {
+    token: Tokenizable<T> | Class<T>;
+    provide?: T;
+    factory?: () => T;
+}
+
+export type ApplicationConfig = Provider[];
 
 // in order to know which parameters of the constructor (index) should be injected (identified by key)
 interface Injection {
@@ -69,6 +78,7 @@ export function Service() {
     };
 }
 
+// @Deprecated
 // mark constructor parameters which should be injected
 // this stores the information about the properties which should be injected
 export function inject(params?: {
@@ -130,14 +140,6 @@ function activator<T>(type: { new(): T }): T {
     return instance;
 }
 
-export type Provider<T = any> =  {
-    token: Tokenizable<T>;
-    provide?: T;
-    factory?: () => T;
-}
-
-export type ApplicationConfig = Provider[];
-
 export function initContainer(): Container {
     if (import.meta.env.SSR) {
         const container = SSR_Storage.ref.getStore()?.get(CONTAINER_KEY);
@@ -177,13 +179,14 @@ export function teardownTestContainer() {
     }
 }
 
-export function svInject<T>(token: new (...args: any[]) => T): T {
-    const container = initContainer();
-    return container.getByClass(token);
+export function svInject<T>(token: Tokenizable<T> | Class<T>): T {
+    const container: Container = initContainer();
+    if(token.prototype === undefined) return container.getByToken(token as Tokenizable);
+    return container.getByClass(token as Class<T>);
 }
 
 export function svInjectOptional<T>(token: Tokenizable<T>) {
-    const container = initContainer();
+    const container: Container = initContainer();
     try {
         return container.getByToken(token)
     } catch (err) {

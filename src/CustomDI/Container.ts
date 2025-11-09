@@ -1,4 +1,4 @@
-import { type ApplicationConfig, injectableConstructors, type Tokenizable } from "./AppInjector.ts";
+import { type ApplicationConfig, Class, injectableConstructors, type Tokenizable } from "./AppInjector.ts";
 import { appConfig } from "../AppConfig.ts";
 import Logger from "../logger/svDebugLogger.ts";
 
@@ -7,6 +7,7 @@ type FactoryEntry<T = any> = { _factory_: () => T };
 export class Container {
     // holding instances of injectable classes by key
     private registry: Map<string, any> = new Map();
+    private factoryRegistry: Map<string, any> = new Map();
     private isInitialized = false;
 
     constructor(mergeWith?: ApplicationConfig) {
@@ -47,11 +48,11 @@ export class Container {
             throw new Error("Cannot register untokenizable" + JSON.stringify(key));
         }
 
-        if (this.registry.has(identifier)) {
+        if (this.factoryRegistry.has(identifier)) {
             console.warn("InjectionContainer - cannot register duplicate key: " + key)
             return;
         }
-        this.registry.set(identifier, { _factory_: factory } as FactoryEntry);
+        this.factoryRegistry.set(identifier, { _factory_: factory } as FactoryEntry);
         Logger.log(`Added ${key} to the registry.`);
     }
 
@@ -85,7 +86,7 @@ export class Container {
         }
     }
 
-    getByClass<T>(token: new (...args: any[]) => T): T {
+    getByClass<T>(token: Class<T>): T {
         if (token.prototype?.constructor?.name) {
             if (!this.has(token.prototype?._service_prop)) {
                 const clazz = injectableConstructors.get(token.prototype?._service_prop);
@@ -101,6 +102,11 @@ export class Container {
     }
 
     get<T>(key: string): T {
+        if(this.factoryRegistry.has(key)){
+            const factory: FactoryEntry<T> = this.factoryRegistry.get(key);
+            return factory._factory_() as T;
+        }
+
         if (!this.registry.has(key)) {
             const clazz = injectableConstructors.get(key);
             if (clazz) {
@@ -109,12 +115,8 @@ export class Container {
                 throw new Error("No constructor exists for: " + key);
             }
         }
-        const entry: FactoryEntry<T> = this.registry.get(key);
 
-        if(entry["_factory_"]) {
-            return entry._factory_() as T;
-        }
-        return entry as T;
+        return this.registry.get(key) as T;
     }
 
     has(key: string): boolean {
@@ -128,9 +130,9 @@ export class Container {
         try {
             for (const element of config) {
                 if(element.provide)
-                    this.registerProvider(element.token, element.provide);
+                    this.registerProvider(element.token as Tokenizable, element.provide);
                 if(element.factory)
-                    this.registerFactory(element.token, element.factory);
+                    this.registerFactory(element.token as Tokenizable, element.factory);
             }
         } catch (e) {
             Logger.err(e);

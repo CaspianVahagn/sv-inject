@@ -1,7 +1,7 @@
 {
   "name": "sv-inject",
   "private": false,
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A lightweight, TypeScript-based dependency injection system designed for Astro applications with SSR support",
   "type": "module",
   "main": "./dist/index.js",
