@@ -17,8 +17,6 @@ export async function makeInjectionContext<T>(callback: () => Promise<T>, config
   SSR_Storage.ref = storage;
   return new Promise<T>(async (resolve, reject) => {
     await storage.run(new Map<string, any>(), async () => {
-
-
       const container = new Container(config);
       storage.getStore()?.set(CONTAINER_KEY, container);
       container.postConstruct();

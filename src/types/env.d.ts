@@ -2,6 +2,7 @@
 interface ImportMetaEnv {
     SSR: boolean | undefined;
     NODE_ENV: 'development' | 'production' | 'test';
+    MODE: "development" | "production" | "test";
 }
 
 interface ImportMeta {
