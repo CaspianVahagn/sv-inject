@@ -3,24 +3,29 @@
 // Export core DI components
 
 export {
-  Service,
-  inject,
-  initContainer,
-  svInject,
-  svInjectOptional,
-  fromAppContext,
-  createToken,
-  setSSRDetection,
-  teardownTestContainer,
-  type Tokenizable,
-  type ApplicationConfig
+    Service,
+    Injectable,
+    Controller,
+    Util,
+    Store,
+    initContainer,
+    svInject,
+    svInjectOptional,
+    fromAppContext,
+    svEject,
+    provide,
+    createToken,
+    setSSRDetection,
+    teardownTestContainer,
+    type Tokenizable,
+    type ApplicationConfig
 } from './CustomDI/AppInjector.ts';
 
 export { Container } from './CustomDI/Container.ts';
 export { SV_ENV } from './CustomDI/SV_ENV.ts';
-export { type PostConstructable } from './CustomDI/life-cycle.types.ts';
-export { SSR_Storage, CONTAINER_KEY } from './CustomDI/ssr-di.utils.ts';
+export { type PostConstructable, type Ejectable } from './CustomDI/life-cycle.types.ts';
+export { SSR_Storage, CONTAINER_KEY, setOptOutDefaultContainer } from './CustomDI/ssr-di.utils.ts';
 
 // Export app configuration
 export { appConfig, setGlobalAppConfig } from './AppConfig.ts';
-export  * as SvDebugLogger from './logger/svDebugLogger.ts';
+export * as SvDebugLogger from './logger/svDebugLogger.ts';

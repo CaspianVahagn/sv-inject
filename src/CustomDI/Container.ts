@@ -1,6 +1,7 @@
 import { type ApplicationConfig, Class, injectableConstructors, type Tokenizable } from "./AppInjector.ts";
 import { appConfig } from "../AppConfig.ts";
 import Logger from "../logger/svDebugLogger.ts";
+import SvDebugLogger from "../logger/svDebugLogger.ts";
 
 type FactoryEntry<T = any> = { _factory_: () => T };
 
@@ -35,7 +36,7 @@ export class Container {
 
         if (key.prototype?.constructor?.name) {
             // @ts-ignore
-            this.register(key.prototype._service_prop, providedInstance);
+            this.register(key.prototype._service_prop || key.prototype?.constructor?.name, providedInstance);
         } else {
             throw new Error("Cannot register untokenizable" + JSON.stringify(key));
         }
@@ -90,7 +91,7 @@ export class Container {
         if (token.prototype?.constructor?.name) {
             if (!this.has(token.prototype?._service_prop)) {
                 const clazz = injectableConstructors.get(token.prototype?._service_prop);
-                if (clazz) {
+                if (clazz && !clazz._service_lazy) {
                     this.registerProvider(token as Tokenizable, new clazz());
                 } else {
                     throw new Error("No constructor exists for: " + token.prototype?._service_prop);
@@ -109,7 +110,7 @@ export class Container {
 
         if (!this.registry.has(key)) {
             const clazz = injectableConstructors.get(key);
-            if (clazz) {
+            if (clazz && !clazz._service_lazy) {
                 this.register(key, new clazz());
             } else {
                 throw new Error("No constructor exists for: " + key);
@@ -138,5 +139,28 @@ export class Container {
             Logger.err(e);
         }
         Logger.info("APP INITIALIZED");
+    }
+
+    eject(token: Tokenizable, force = false) {
+        if(token.id) return this.removeAndCallCleanup(token.id);
+        if(token.prototype && token.prototype._service_prop) {
+            if(token.prototype._service_lazy) return this.removeAndCallCleanup(token.prototype._service_prop)
+            if(force) return this.removeAndCallCleanup(token.prototype._service_prop)
+            console.error(`ejection of non lazy Injectable [${token.prototype._service_prop}] from the context, will lead to unexpected behaviour. If you know what you are doing, call eject(token, true)`);
+        }
+        console.error(token, "Can't eject. Is not registered in the injection context")
+    }
+
+    private removeAndCallCleanup(key: string){
+        const instance = this.registry.get(key);
+        instance.onEject && instance.onEject();
+        SvDebugLogger.info("Ejected", key, instance.constructor.name, "from the container")
+        return this.registry.delete(key);
+    }
+
+    public CLEAN_ALL(){
+        for(const [_,value] of this.registry.entries()){
+            value.onEject && value.onEject();
+        }
     }
 }

@@ -12,8 +12,13 @@ export * from './index.js';
  * @param {ApplicationConfig} [config] Optional application configuration used to initialize the container.
  * @return {Promise<T>} A promise that resolves with the result of the executed callback, or rejects with an error if the callback fails.
  */
+const storage = new AsyncLocalStorage();
+
+// @ts-ignore
+globalThis.primaryStorage = storage;
+
 export async function makeInjectionContext<T>(callback: () => Promise<T>, config?: ApplicationConfig): Promise<T> {
-    const storage = new AsyncLocalStorage();
+
     // @ts-ignore
     SSR_Storage.ref = storage; // SAME reference as in index.js
 

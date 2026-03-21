@@ -11,8 +11,8 @@ A lightweight, TypeScript-based dependency injection system designed primarily f
 - [🚀 Features](#-features)
 - [📦 Installation](#-installation)
 - [🔰 Getting Started](#-getting-started)
-  - [TypeScript Configuration](#️-typescript-configuration)
-  - [Creating Injectable Services](#creating-injectable-services)
+  - [TypeScript Configuration](#-typescript-configuration)
+  - [Creating Injectable Services](#creating-injectable-classes-)
   - [Using Services in Components](#using-services-in-components)
 - [🌐 SSR Support](#-ssr-support)
   - [Astro Example](#astro-example)
@@ -26,22 +26,25 @@ A lightweight, TypeScript-based dependency injection system designed primarily f
 - [🔑 Token-Based Injection](#-token-based-injection)
   - [Defining Tokens](#defining-tokens)
   - [Application-Scoped Token Usage](#-application-scoped-token-usage)
-  - [Optional SSR Tokens](#-optional-ssr-tokens)
-- [⚙️ Advanced Usage](#️-advanced-usage)
-  - [Lifecycle Awareness](#️-lifecycle-awareness)
-  - [Singleton Scope and Manual Registration](#-singleton-scope-and-manual-registration)
-  - [Injection Order & Circular Dependency Protection](#-injection-order--circular-dependency-protection)
 - [❓ Why Request-Scoped Containers Matter](#-why-request-scoped-containers-matter)
 
 ---
 
 ## 🚀 Features
 
-- ✅ Decorator-based service registration (`@Service()`) and dependency injection (`svInject()`)
+- ✅ Decorator-based service registration (`@Injectable()`) and dependency injection (`svInject()`)
 - 📦 Request-scoped containers for safe SSR execution
 - ⚙️ Lifecycle hooks (`postConstruct`)
 - 🔌 Integrations for Astro, Next.js, and other Vite-based SSR frameworks
 - 🛠 Framework-agnostic: use in any modern TypeScript SSR app
+- 📦 No dependencies (besides vite based build tools)
+- 🪶 Minimalistic: 2kb gzipped 6.1 kb minified
+
+## Inspiration
+
+This library is heavily inspired by Angulars DI system.
+It is designed to be framework-agnostic, so that it can be used in any modern SSR app.
+But originally conceptualized for AstroJS + Svelte to have a lightweight DI system, shared accross components and Islands. 
 
 **important:** since this framework should be minimal, no automatic resolution of "module/component scope" will be implemented.
 If you fear "global state pollution", you have to add containers to the root injection context, yourself.
@@ -69,7 +72,18 @@ This library uses experimental decorators and metadata reflection. You must enab
 }
 ```
 
-### Creating Injectable Services
+### Creating Injectable Classes 
+
+For Informative purposes, multiple ways of defining Injectables are shown here.
+All of them are equivalent, but with different names to have an "Archetype." 
+
+```typescript
+@Store() // for stores
+@Injectable() // non specific
+@Service() // services
+@Controller() // controllers
+@Util() // utilities
+```
 
 ```typescript
 import { Service, inject } from 'sv-inject';
@@ -107,6 +121,7 @@ class AuthService {
   }
 }
 ```
+
 
 Or as explicit constructor injection:
 
@@ -163,8 +178,7 @@ import { makeInjectionContext } from "sv-inject/server"
 
 // In an Astro middleware
 export const MyMiddleware = defineMiddleware(async (context, next) => {
-  return new Promise<Response>(async (resolve, reject) => {
-    // Define request-specific configuration
+
     const ssrConfig: ApplicationConfig = [
       {
         token: REQUEST_TOKEN,
@@ -177,11 +191,11 @@ export const MyMiddleware = defineMiddleware(async (context, next) => {
     ];
 
     // Create a unique container for this request
-    makeInjectionContext(async () => {
+    return makeInjectionContext(async () => {
       const response = await next();
-      resolve(response);
-    }, ssrConfig).catch(reject);
-  });
+      // You can also modify the response if needed
+      return response
+    }, ssrConfig)
 });
 ```
 
@@ -274,22 +288,6 @@ A container will be initialized per request or on CSR on first render.
 ```typescript
 const container = initContainer();
 ```
-
-#### `Container`
-
-The core container class for dependency injection.
-
-Methods:
-- `registerProvider(key: Tokenizable, providedInstance: any)`: Registers a provider with a token
-- `registerFactory(key: Tokenizable, providedInstance: () => any)`: Registers a Factory with a token
-- `register(key: string, instance: any)`: Registers an instance with a string key
-- `getByToken<T>(token: Tokenizable<T>): T`: Gets an instance by token
-- `getByTokenOptional<T>(token: Tokenizable): T | undefined`: Gets an instance by token, returning undefined if not found
-- `getByClass<T>(token: new (...args: any[]) => T): T`: Gets an instance by class constructor
-- `get<T>(key: string): T`: Gets an instance by string key
-- `has(key: string): boolean`: Checks if an instance exists
-- `loadConfig(config: ApplicationConfig)`: Loads configuration into the container
-- `postConstruct()`: Calls postConstruct lifecycle hook on all registered instances
 
 ### Configuration Methods
 
@@ -471,6 +469,16 @@ const value = svInjectOptional(SSR_ONLY_TOKEN);
 This avoids runtime errors when rendering in non-SSR or static contexts.
 
 ## ⚙️ Advanced Usage
+
+### Debugging
+
+If you need to debug your DI, you can enable debug logging by:
+
+```typescript
+import { SvDebugLogger } from "sv-inject";
+
+SvDebugLogger.default.enable();
+```
 
 ### ⚠️ Lifecycle Awareness
 
