@@ -8,37 +8,37 @@ A lightweight, TypeScript-based dependency injection system designed primarily f
 
 ## 📑 Table of Contents
 
-- [🚀 Features](#-features)
-- [📦 Installation](#-installation)
-- [🔰 Getting Started](#-getting-started)
+- [ Features](#-features)
+- [ Installation](#-installation)
+- [ Getting Started](#-getting-started)
   - [TypeScript Configuration](#-typescript-configuration)
   - [Creating Injectable Services](#creating-injectable-classes-)
   - [Using Services in Components](#using-services-in-components)
-- [🌐 SSR Support](#-ssr-support)
+- [ SSR Support](#-ssr-support)
   - [Astro Example](#astro-example)
   - [NextJS Example](#nextjs-example)
-- [📚 API Reference](#-api-reference)
+- [ API Reference](#-api-reference)
   - [Core Decorators](#core-decorators)
   - [Injection Methods](#injection-methods)
   - [Container Management](#container-management)
   - [Configuration Methods](#configuration-methods)
   - [SSR Utilities](#ssr-utilities)
-- [🔑 Token-Based Injection](#-token-based-injection)
+- [ Token-Based Injection](#-token-based-injection)
   - [Defining Tokens](#defining-tokens)
   - [Application-Scoped Token Usage](#-application-scoped-token-usage)
-- [❓ Why Request-Scoped Containers Matter](#-why-request-scoped-containers-matter)
+- [ Why Request-Scoped Containers Matter](#-why-request-scoped-containers-matter)
 
 ---
 
-## 🚀 Features
+## Features
 
 - ✅ Decorator-based service registration (`@Injectable()`) and dependency injection (`svInject()`)
 - 📦 Request-scoped containers for safe SSR execution
 - ⚙️ Lifecycle hooks (`postConstruct`)
-- 🔌 Integrations for Astro, Next.js, and other Vite-based SSR frameworks
-- 🛠 Framework-agnostic: use in any modern TypeScript SSR app
+-  Integrations for Astro, Next.js, and other Vite-based SSR frameworks
+-  Framework-agnostic: use in any modern TypeScript SSR app
 - 📦 No dependencies (besides vite based build tools)
-- 🪶 Minimalistic: 2kb gzipped 6.1 kb minified
+- 🪶 Minimalistic: ~2kb gzipped 6.1 kb minified
 
 ## Inspiration
 
@@ -46,8 +46,8 @@ This library is heavily inspired by Angulars DI system.
 It is designed to be framework-agnostic, so that it can be used in any modern SSR app.
 But originally conceptualized for AstroJS + Svelte to have a lightweight DI system, shared accross components and Islands. 
 
-**important:** since this framework should be minimal, no automatic resolution of "module/component scope" will be implemented.
-If you fear "global state pollution", you have to add containers to the root injection context, yourself.
+**important:** since this library should be minimal, no automatic resolution of "module/component scope" will be implemented.
+If you fear "global state pollution", you have to add containers to the root injection context, yourself, or use Factories to provide scoped instances.
 
 ---
 
@@ -87,10 +87,11 @@ All of them are equivalent, but with different names to have an "Archetype."
 
 ```typescript
 import { Service, inject } from 'sv-inject';
+import {type PostConstructable } from "sv-inject";
 
 // Define a service
 @Service()
-class UserService {
+class UserService implements PostConstructable {
   constructor() {
     // Service initialization
   }
@@ -109,7 +110,7 @@ class UserService {
 @Service()
 class AuthService {
   private userService = svInject(UserService);
-  
+
   constructor() {
     // Service initialization
   }
@@ -160,9 +161,10 @@ authService.authenticate(credentials);
 
 The `svInject()` function pulls the service instance from the current injection context (global or request-scoped).
 
-## 🌐 SSR Support
+## SSR Support
 
-In SSR (Server-Side Rendering), every HTTP request runs in a shared server environment. Without proper isolation, service instances can leak data between users. sv-inject solves this by providing request-scoped containers — each request gets its own dependency graph, preventing cross-request pollution.
+In SSR (Server-Side Rendering), every HTTP request runs in a shared server environment. Without proper isolation, service instances can leak data between users. 
+sv-inject solves this by providing request-scoped containers — each request gets its own dependency graph, preventing cross-request pollution.
 
 These request containers are created with `makeInjectionContext()`, wrapping any async render or middleware logic.
 
@@ -177,25 +179,19 @@ import { makeInjectionContext } from "sv-inject/server"
 
 
 // In an Astro middleware
-export const MyMiddleware = defineMiddleware(async (context, next) => {
+export const DiMiddleware: MiddlewareHandler = defineMiddleware((context, next) => {
+  const { params, request, url, cookies } = context;
 
-    const ssrConfig: ApplicationConfig = [
-      {
-        token: REQUEST_TOKEN,
-        provide: context.request,
-      },
-      {
-        token: COOKIES_TOKEN,
-        provide: context.cookies,
-      }
-    ];
+  const ssrConfig: ApplicationConfig = [
+    { token: SSR_COOKIE, provide: cookies },
+    { token: SSR_REQUEST, provide: request },
+    { token: SSR_REQUEST_PARAMS, provide: params },
+    { token: SSR_URL, provide: url }
+  ];
 
-    // Create a unique container for this request
-    return makeInjectionContext(async () => {
-      const response = await next();
-      // You can also modify the response if needed
-      return response
-    }, ssrConfig)
+  return makeInjectionContext(async () => {
+    return next(); // the render happens in the next() call, which hase now the ability access all ssrConfig properties via injection per request
+  }, ssrConfig);
 });
 ```
 
@@ -245,7 +241,7 @@ export async function middleware(request: NextRequest) {
 }
 ```
 
-## 📚 API Reference
+## API Reference
 
 ### Core Decorators
 
@@ -262,9 +258,9 @@ class UserService {
 
 ### Injection Methods
 
-#### `svInject<T>(token: new (...args: any[]) => T): T`
+#### `svInject<T>(token: token: Tokenizable<T> | Class<T>: T`
 
-Injects a service by class constructor, throws error if its not registered.
+Injects a service by class or a specivied token, throws error if its not registered.
 
 ```typescript
 const userService = svInject(UserService);
@@ -285,6 +281,8 @@ const request = svInjectOptional<Request>(REQUEST_TOKEN);
 Initializes or retrieves the DI container if it is already initialized.
 A container will be initialized per request or on CSR on first render.
 
+should not be called or used if no specific reason to manipulate the container exists.
+
 ```typescript
 const container = initContainer();
 ```
@@ -297,19 +295,24 @@ Sets the global application configuration for the application.
 In SSR mode, this is used to set the global configuration for the server, but it will not be request-scoped.
 
 Setting the global config must happen in a suitable place of the app, before any container is initialized.
-Suitable places should be: index.ts or similar. 
+Suitable places should be: index.ts or similar, or before/withing any bootstrap function called before the app is initialized.
 
 
 ```typescript
 import { createToken } from "./sv-inject";
 
-const API_URL_TOKEN = createToken<string>("API_URL")
+const API_URL_TOKEN = createToken<string>("API_URL");
+const APP_NAME = createToken<string>("APP_NAME")
 
 setGlobalAppConfig([
   {
     token: API_URL_TOKEN,
     provide: 'https://api.example.com'
-  }
+  },
+  {
+    token: APP_NAME,
+    provide: 'MyApp'
+  },
 ]);
 ```
 
@@ -350,6 +353,8 @@ class RemoteLogger extends Logger {
 
 
 // Configure using a factory so that a specific implementation is injected for an abstract key
+
+
 const config: ApplicationConfig = [
   {
     token: Logger,          // abstract token or abstract class can be used as the key
@@ -398,18 +403,20 @@ initContainer().registerFactory(LOGGER_TOKEN, memoLoggerFactory);
 
 #### `makeInjectionContext<T>(callback: () => Promise<T>, config?: ApplicationConfig): Promise<T>`
 
-Creates an injection context utilizing [async local storage](https://nodejs.org/api/async_context.html#class-asynclocalstorage) and an application container. This method is mandatory for SSR request context aware injection containers.
+Creates an injection context utilizing [async local storage](https://nodejs.org/api/async_context.html#class-asynclocalstorage) and an application container. 
+This method is mandatory for SSR request context aware injection containers.
 
 ```typescript
 await makeInjectionContext(async () => {
   // Your SSR code here
+  const response = await appRenderFunction(); // The function that renders you app must be called within the context of the injection container, to ensure injection
   return response;
 }, config);
 ```
 
 
 
-## 🔑 Token-Based Injection
+##  Token-Based Injection
 
 `sv-inject` supports **token-based dependency injection**, allowing you to inject services, values, or request-specific objects (like cookies or headers) without relying solely on class constructors.
 
@@ -422,11 +429,9 @@ import { createToken } from "sv-inject";
 const REQUEST_TOKEN = createToken("REQUEST");
 ```
 
-> 🟡 **Important:** All tokens must be **unique and non-empty**. Failing to do so may result in collisions or unexpected injection behavior.
+> 🟡 **Important:** All tokens must be **unique and non-empty strings**. Failing to do so may result in collisions or unexpected injection behavior.
 
-### ✅ Application-Scoped Token Usage
-
-It is **strongly advised** to define all tokens within your `ApplicationConfig`:
+### Application-Scoped Token Usage
 
 ```ts
 import { createToken, setGlobalAppConfig } from "sv-inject";
@@ -468,7 +473,7 @@ const value = svInjectOptional(SSR_ONLY_TOKEN);
 
 This avoids runtime errors when rendering in non-SSR or static contexts.
 
-## ⚙️ Advanced Usage
+## ️ Advanced Usage
 
 ### Debugging
 
@@ -480,7 +485,7 @@ import { SvDebugLogger } from "sv-inject";
 SvDebugLogger.default.enable();
 ```
 
-### ⚠️ Lifecycle Awareness
+### Lifecycle Awareness
 
 In a case where you need to perform a Injection exactly in the same time as a Provider is created, e.g. At "AppConfiguration" level, 
 or somewhere Post app Initialization, you can use the `postConstruct` lifecycle hook, to inject the service after the provider is created,
@@ -500,31 +505,46 @@ class Example {
 }
 ```
 
-
-
-### 🔄 Singleton Scope and Manual Registration
+### Singleton Scope
 
 All services in `sv-inject` are **singletons** by default within their container context.
+All non-singleton services must be explicitly added via a factory provider.
 
-If a service or state needs to be recreated on each injection: Use a factory. 
-If as instance needs to be created later than app initialization and injected dynamically, register it manually using:
+### Lazy injectables and removing instance from the Container 
+
+all `@Injectable` are eagerly instantiated by default.
+To make them lazy `@Service("LAZY")` put `LAZY` as parameter.
+
+Thes services will be registered by not initiated without explicit call of "provide" method.
+
+example:
 
 ```ts
-initContainer().registerProvider(token, instance);
+@Service("LAZY")
+class Example {
+  public iamLazy() {
+    return "I am lazy";
+  }
+}
+
 ```
 
-For example:
+To provide the instance for only a certain context or route, or page: 
 
 ```ts
-import { createToken } from "sv-inject";
 
-const LOCALE_TOKEN = createToken<string>("LOCALE");
+provide(Example);
 
-initContainer().registerProvider(LOCALE_TOKEN, 'en-US');
+const exampleService = svInject(Example);
+// do something with exampleService
+
+onDestroy(() => {
+    eject(Example);
+})
+
 ```
 
-
-### 🔄 Injection Order
+### Injection Order
 
 * Injection order is resolved automatically by the DI container.
 * This ensures **predictable and safe injection flow**, even across complex service graphs.
@@ -537,8 +557,6 @@ initContainer().registerProvider(LOCALE_TOKEN, 'en-US');
  - or use a factory with custom constructor logic
 
 No warranty is given for circular dependency resolution.
-
-
 
 ## ❓ Why Request-Scoped Containers Matter
 
