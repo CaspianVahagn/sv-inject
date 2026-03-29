@@ -37,7 +37,9 @@ export function setSSRDetection(isSSRfn: () => boolean) {
     SV_ENV.platform.SSR = isSSRfn();
 }
 
-export const injectableConstructors = new Map<string, Class<any>>();
+globalThis.svInjectableConstructors = new Map<string, Class<any>>();
+
+export const injectableConstructors = () => globalThis.svInjectableConstructors as Map<string, Class<any>>;
 
 /**
  * Creates a token object with the specified identifier.
@@ -53,13 +55,13 @@ export function createToken<T>(id: string): Tokenizable<T> {
 function MakeInjectable(tag: string = "injectable", lazy = false) {
     return function injectionTarget<T extends { new(...args: any[]): {} }>(constructor: T): T | void {
         const proto = constructor.prototype;
-        const id = injectableConstructors.size.toString();
+        const id = injectableConstructors().size.toString();
         proto._service_prop = `${tag}_${constructor.name}_${id}`;
         proto._service_tag = tag;
         proto._service_lazy = lazy;
         Logger.log("Make service Injectable:", constructor.name, "lazy:", lazy);
         // replacing the original constructor with a new one that provides the injections from the Container
-        injectableConstructors.set(
+        injectableConstructors().set(
             proto._service_prop,
             class extends constructor {
                 static _service_prop = proto._service_prop;
@@ -245,7 +247,7 @@ export function provide<T>(provision: Tokenizable<T> | Provider | Class<T>) {
 
     const propName = (provision as Class<T>).prototype?._service_prop;
     if (propName) {
-        const clazz = injectableConstructors.get(propName);
+        const clazz = injectableConstructors().get(propName);
         if (!clazz) throw new Error("No providable constructor exists for: " + propName);
         return container.register(propName, new clazz());
     }

@@ -22,6 +22,6 @@
       "@sv-inject/*": ["src/*"]
     }
   },
-  "include": ["src/**/*.ts", "types"],
+  "include": ["src/**/*.ts", "types", "./src/types/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

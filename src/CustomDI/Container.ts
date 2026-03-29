@@ -90,7 +90,7 @@ export class Container {
     getByClass<T>(token: Class<T>): T {
         if (token.prototype?.constructor?.name) {
             if (!this.has(token.prototype?._service_prop)) {
-                const clazz = injectableConstructors.get(token.prototype?._service_prop);
+                const clazz = injectableConstructors().get(token.prototype?._service_prop);
                 if (clazz && !clazz._service_lazy) {
                     this.registerProvider(token as Tokenizable, new clazz());
                 } else {
@@ -109,7 +109,7 @@ export class Container {
         }
 
         if (!this.registry.has(key)) {
-            const clazz = injectableConstructors.get(key);
+            const clazz = injectableConstructors().get(key);
             if (clazz && !clazz._service_lazy) {
                 this.register(key, new clazz());
             } else {
