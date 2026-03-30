@@ -1,7 +1,10 @@
-import { SV_ENV } from "./SV_ENV.ts";
 import { Container } from "./Container.ts";
 import Logger from "../logger/svDebugLogger.ts";
-import { CONTAINER_KEY, SSR_Storage } from "./ssr-di.utils.ts";
+import { CONTAINER_KEY, getSSRStorage } from "./ssr-di.utils.ts";
+
+if(!globalThis.svInjectRefs) {
+    globalThis.svInjectRefs = {};
+}
 
 export type Class<T = any> = ( new (...args: any[]) => T ) & {
     _service_prop?: string,
@@ -34,7 +37,11 @@ interface Injection {
  * @param isSSRfn
  */
 export function setSSRDetection(isSSRfn: () => boolean) {
-    SV_ENV.platform.SSR = isSSRfn();
+    if (!globalThis.svInjectEnv) {
+        globalThis.svInjectEnv = import.meta.env;
+    }
+    // @ts-ignore
+    globalThis.svInjectEnv.SSR = isSSRfn();
 }
 
 globalThis.svInjectableConstructors = new Map<string, Class<any>>();
@@ -133,48 +140,37 @@ export const Util = (lazy: InjectionBehaviour = "EAGER") => MakeInjectable("Util
 // }
 
 export function fromAppContext<T>(clazz: Class<T>): T {
-    // @ts-ignore
     return activator(clazz);
 }
 
 function activator<T>(type: Class<T>): T {
-    // @ts-ignore
-    const Container = initContainer();
-    if (!Container) {
-        throw new Error("Container is not defined");
-    }
+    const container = initContainer();
     const name =
         type._service_prop || ( type.prototype.constructor.name as string );
     if (!name) {
         throw new Error("No name provided");
     }
-    if (Container.has(name)) {
-        return Container.get(name);
+    if (container.has(name)) {
+        return container.get(name);
     }
     const instance = new type();
-    Container.register(name, instance);
+    container.register(name, instance);
     return instance;
-}
-
-export function ensureDevContainer() {
-    if(import.meta.env.MODE === "development") {
-        // @ts-ignore
-        SSR_Storage.ref = globalThis.primaryStorage;
-    }
 }
 
 export function initContainer(): Container {
     if (import.meta.env.SSR) {
-        ensureDevContainer();
-        const container = SSR_Storage.ref.getStore()?.get(CONTAINER_KEY);
+        const storage = getSSRStorage();
+        const container = storage.getStore()?.get(CONTAINER_KEY);
+
         if (!container) {
             if (import.meta.env.MODE === "test") {
-                if (!SV_ENV.testContainer) {
+                if (!globalThis.svInjectRefs.testContainer) {
                     Logger.log("Create new test Env container");
-                    SV_ENV.testContainer = new Container();
-                    SV_ENV.testContainer?.postConstruct();
+                    globalThis.svInjectRefs.testContainer = new Container();
+                    globalThis.svInjectRefs.testContainer?.postConstruct();
                 }
-                return SV_ENV.testContainer;
+                return globalThis.svInjectRefs.testContainer;
             }
 
             if (import.meta.env.MODE === "development") {
@@ -185,32 +181,31 @@ export function initContainer(): Container {
                 return new Container();
             } else {
 
-                const store = SSR_Storage.ref.getStore();
-                const ref = SSR_Storage.ref;
-                console.warn("Container not in ssr context", store, ref);
+                const store = storage.getStore();
+                console.warn("Container not in ssr context", store, storage);
 
                 if(!store) throw new Error("SSR_Storage (AsyncLocalStorage) is not defined");
                 console.trace("Create new Env container.");
-                store.set(CONTAINER_KEY, new Container());
+                const newContainer = new Container();
+                store.set(CONTAINER_KEY, newContainer);
+                return newContainer;
             }
-
-
 
             throw new Error("Container is not defined");
         }
         return container;
     }
-    if (!SV_ENV.container) {
+    if (!globalThis.svInjectRefs.container) {
         Logger.log("Create new Basic Env container");
-        SV_ENV.container = new Container();
-        SV_ENV.container?.postConstruct();
+        globalThis.svInjectRefs.container = new Container();
+        globalThis.svInjectRefs.container?.postConstruct();
     }
-    return SV_ENV.container!;
+    return globalThis.svInjectRefs.container!;
 }
 
 export function teardownTestContainer() {
-    if (SV_ENV.testContainer) {
-        SV_ENV.testContainer = undefined;
+    if (globalThis.svInjectRefs.testContainer) {
+        globalThis.svInjectRefs.testContainer = undefined;
     }
 }
 

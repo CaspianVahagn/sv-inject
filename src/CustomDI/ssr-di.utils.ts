@@ -1,20 +1,29 @@
 import { Container } from "./Container.ts";
 
-let optOutDefaultContainer = false;
-
 globalThis.svInjectEnv = import.meta.env;
 
-let ref = {
+if(!globalThis.svInjectRefs) {
+    globalThis.svInjectRefs = {};
+}
+
+const defaultRef = {
     getStore: () => {
-        if (optOutDefaultContainer) return new Map<string, Container>();
-        if (globalThis.svInjectRefs.SSR_Storage.getStore) return globalThis.svInjectRefs.SSR_Storage.getStore();
+        if (globalThis.svInjectRefs.useDefaultContainer === false) return new Map<string, Container>();
+        if (globalThis.svInjectRefs.SSR_Storage?.getStore) return globalThis.svInjectRefs.SSR_Storage.getStore();
         return new Map<string, Container>([[CONTAINER_KEY, new Container()]])
     }
 }
 
-export const SSR_Storage = { ref };
 export const CONTAINER_KEY = "@@sv_ssr_container";
 
+export function getSSRStorage() {
+    return globalThis.svInjectRefs.SSR_Storage || defaultRef;
+}
+
+export function setSSRStorage(storage: { getStore: () => Map<string, Container> | undefined }) {
+    globalThis.svInjectRefs.SSR_Storage = storage;
+}
+
 export function setOptOutDefaultContainer(flag: boolean) {
-    if (flag) optOutDefaultContainer = true;
+    globalThis.svInjectRefs.useDefaultContainer = !flag;
 }

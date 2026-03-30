@@ -22,9 +22,8 @@ export {
 } from './CustomDI/AppInjector.ts';
 
 export { Container } from './CustomDI/Container.ts';
-export { SV_ENV } from './CustomDI/SV_ENV.ts';
 export { type PostConstructable, type Ejectable } from './CustomDI/life-cycle.types.ts';
-export { SSR_Storage, CONTAINER_KEY, setOptOutDefaultContainer } from './CustomDI/ssr-di.utils.ts';
+export { getSSRStorage, CONTAINER_KEY, setOptOutDefaultContainer } from './CustomDI/ssr-di.utils.ts';
 
 // Export app configuration
 export { appConfig, setGlobalAppConfig } from './AppConfig.ts';

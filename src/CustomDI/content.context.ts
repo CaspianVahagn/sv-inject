@@ -1,10 +1,11 @@
-import { Container, CONTAINER_KEY, SSR_Storage } from "../index.ts";
+import { Container, CONTAINER_KEY } from "../index.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { ApplicationConfig } from "./AppInjector.ts";
 
 export type EjectFn = () => void;
 
-/**
+
+/** @Deprecated
  * Creates an injection context utilizing async local storage and an application container.
  * this method is mandatory for SSR request context aware injection containers
  *
