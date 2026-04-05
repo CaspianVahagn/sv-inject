@@ -44,9 +44,12 @@ export function setSSRDetection(isSSRfn: () => boolean) {
     globalThis.svInjectEnv.SSR = isSSRfn();
 }
 
-globalThis.svInjectableConstructors = new Map<string, Class<any>>();
-
-export const injectableConstructors = () => globalThis.svInjectableConstructors as Map<string, Class<any>>;
+export const injectableConstructors = () => {
+    if(!globalThis.svInjectableConstructors) {
+        globalThis.svInjectableConstructors = new Map<string, Class<any>>();
+    }
+    return globalThis.svInjectableConstructors as Map<string, Class<any>>;
+}
 
 /**
  * Creates a token object with the specified identifier.
@@ -138,25 +141,6 @@ export const Util = (lazy: InjectionBehaviour = "EAGER") => MakeInjectable("Util
 //         });
 //     };
 // }
-
-export function fromAppContext<T>(clazz: Class<T>): T {
-    return activator(clazz);
-}
-
-function activator<T>(type: Class<T>): T {
-    const container = initContainer();
-    const name =
-        type._service_prop || ( type.prototype.constructor.name as string );
-    if (!name) {
-        throw new Error("No name provided");
-    }
-    if (container.has(name)) {
-        return container.get(name);
-    }
-    const instance = new type();
-    container.register(name, instance);
-    return instance;
-}
 
 export function initContainer(): Container {
     if (import.meta.env.SSR) {

@@ -124,8 +124,8 @@ export class Container {
         return this.registry.has(key);
     }
 
-    loadConfig(config: ApplicationConfig) {
-        if (this.isInitialized) {
+    loadConfig(config: ApplicationConfig, overwrite = false) {
+        if (this.isInitialized && !overwrite) {
             console.trace("reinitialize container, all duplicate providers will be ignored")
         }
         try {

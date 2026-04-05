@@ -11,7 +11,6 @@ export {
     initContainer,
     svInject,
     svInjectOptional,
-    fromAppContext,
     svEject,
     provide,
     createToken,
